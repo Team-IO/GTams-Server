@@ -1,0 +1,9 @@
+apply plugin: 'java'
+
+repositories {
+    jcenter()
+}
+
+dependencies {
+    compile 'org.apache.httpcomponents:httpcore:4.3.2'
+}

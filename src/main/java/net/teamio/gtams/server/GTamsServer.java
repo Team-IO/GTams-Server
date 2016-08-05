@@ -3,6 +3,7 @@ package net.teamio.gtams.server;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.Random;
 import java.util.UUID;
 
 import org.apache.http.HttpConnectionFactory;
@@ -36,6 +37,8 @@ import net.teamio.gtams.server.entities.EAuthenticate;
 import net.teamio.gtams.server.entities.EPlayerData;
 import net.teamio.gtams.server.entities.ETerminalData;
 import net.teamio.gtams.server.entities.ETerminalOwner;
+import net.teamio.gtams.server.entities.TradeDescriptor;
+import net.teamio.gtams.server.entities.TradeInfo;
 
 public class GTamsServer {
 
@@ -64,6 +67,7 @@ public class GTamsServer {
 		mapper.register("/newterminal", new RHNewTerminal());
 		mapper.register("/destroyterminal", new RHDestroyTerminal());
 		mapper.register("/player_status", new RHPlayerStatus());
+		mapper.register("/trade", new RHTradeInfo());
 
 		ListenerThread liThread = new ListenerThread(httpService);
 		System.out.println("Server started...");
@@ -255,6 +259,45 @@ public class GTamsServer {
 					System.out.println("Player/Owner status of " + ent.id + " is " + (ent.online ? "ONLINE" : "OFFLINE"));
 
 					//TODO: Process the status
+				}
+			}
+		}
+
+	}
+
+	private static class RHTradeInfo implements HttpRequestHandler {
+
+		@Override
+		public void handle(HttpRequest request, HttpResponse response, HttpContext context)
+				throws HttpException, IOException {
+
+			if(request instanceof HttpEntityEnclosingRequest) {
+				HttpEntity entity = ((HttpEntityEnclosingRequest) request).getEntity();
+				if(entity == null) {
+					//TODO whatever
+				} else {
+					String json = EntityUtils.toString(entity);
+					TradeDescriptor ent = gson.fromJson(json, TradeDescriptor.class);
+
+					System.out.println("Client requested trade info for " + ent);
+					System.out.println(json);
+					Random rand = new Random();
+
+					TradeInfo info = new TradeInfo();
+					info.demand = rand.nextInt(30000);
+					info.supply = rand.nextInt(30000);
+
+					if(info.demand == 0) {
+						info.supplyDemandFactor = Float.POSITIVE_INFINITY;
+					} else {
+						info.supplyDemandFactor = info.supply / (float)info.demand;
+					}
+					info.tradesLastPeriod = rand.nextInt(30000) + 100;
+					info.volumeLastPeriod = rand.nextInt(30000) + 100;
+					info.meanPrice = info.volumeLastPeriod / (float)info.tradesLastPeriod;
+
+					response.setStatusCode(HttpStatus.SC_CREATED);
+					response.setEntity(new StringEntity(gson.toJson(info)));
 				}
 			}
 		}

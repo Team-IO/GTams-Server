@@ -27,6 +27,15 @@ import org.apache.http.protocol.ResponseContent;
 import org.apache.http.protocol.ResponseDate;
 import org.apache.http.protocol.ResponseServer;
 import org.apache.http.protocol.UriHttpRequestHandlerMapper;
+import org.apache.http.util.EntityUtils;
+
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+
+import net.teamio.gtams.server.entities.EAuthenticate;
+import net.teamio.gtams.server.entities.EPlayerData;
+import net.teamio.gtams.server.entities.ETerminalData;
+import net.teamio.gtams.server.entities.ETerminalOwner;
 
 public class GTamsServer {
 
@@ -35,6 +44,8 @@ public class GTamsServer {
 	public static void main(String[] args) {
 		new GTamsServer();
 	}
+
+	static Gson gson = new GsonBuilder().serializeNulls().setPrettyPrinting().create();
 
 	public GTamsServer() {
 		System.out.println("Setting up HTTP Server...");
@@ -48,6 +59,11 @@ public class GTamsServer {
 		HttpService httpService = new HttpService(processor, mapper);
 
 		mapper.register("/authenticate", new RHAuth());
+		mapper.register("/terminal_status", new RHTerminalStatus());
+		mapper.register("/terminal_owner", new RHTerminalOwner());
+		mapper.register("/newterminal", new RHNewTerminal());
+		mapper.register("/destroyterminal", new RHDestroyTerminal());
+		mapper.register("/player_status", new RHPlayerStatus());
 
 		ListenerThread liThread = new ListenerThread(httpService);
 		System.out.println("Server started...");
@@ -127,17 +143,18 @@ public class GTamsServer {
 		@Override
 		public void handle(HttpRequest request, HttpResponse response, HttpContext context)
 				throws HttpException, IOException {
-			String randomUUID = UUID.randomUUID().toString();
 
-			System.out.println("Authenticating Client with 'token' random UUID: " + randomUUID);
+			EAuthenticate entity = new EAuthenticate(UUID.randomUUID().toString());
+
+			System.out.println("Authenticating Client with 'token' random UUID: " + entity.token);
 
 			response.setStatusCode(HttpStatus.SC_CREATED);
-			response.setEntity(new StringEntity(randomUUID));
+			response.setEntity(new StringEntity(gson.toJson(entity)));
 		}
 
 	}
 
-	private static class RequestHandler implements HttpRequestHandler {
+	private static class RHTerminalStatus implements HttpRequestHandler {
 
 		@Override
 		public void handle(HttpRequest request, HttpResponse response, HttpContext context)
@@ -148,7 +165,96 @@ public class GTamsServer {
 				if(entity == null) {
 					//TODO whatever
 				} else {
-					//TODO: entity.getContent() => JSON
+					String json = EntityUtils.toString(entity);
+					ETerminalData ent = gson.fromJson(json, ETerminalData.class);
+
+					System.out.println("Terminal status of " + ent.id + " is " + (ent.online ? "ONLINE" : "OFFLINE"));
+
+					//TODO: Process the status
+				}
+			}
+		}
+
+	}
+
+	private static class RHTerminalOwner implements HttpRequestHandler {
+
+		@Override
+		public void handle(HttpRequest request, HttpResponse response, HttpContext context)
+				throws HttpException, IOException {
+
+			if(request instanceof HttpEntityEnclosingRequest) {
+				HttpEntity entity = ((HttpEntityEnclosingRequest) request).getEntity();
+				if(entity == null) {
+					//TODO whatever
+				} else {
+					String json = EntityUtils.toString(entity);
+					ETerminalOwner ent = gson.fromJson(json, ETerminalOwner.class);
+
+					System.out.println("Terminal " + ent.id + " is now owned by " + ent.owner);
+
+					//TODO: Process the status
+				}
+			}
+		}
+
+	}
+
+	private static class RHNewTerminal implements HttpRequestHandler {
+
+		@Override
+		public void handle(HttpRequest request, HttpResponse response, HttpContext context)
+				throws HttpException, IOException {
+
+			ETerminalData entity = new ETerminalData(UUID.randomUUID(), true);
+
+			System.out.println("Creating new terminalwith ID: " + entity.id);
+
+			response.setStatusCode(HttpStatus.SC_CREATED);
+			response.setEntity(new StringEntity(gson.toJson(entity)));
+		}
+
+	}
+
+	private static class RHDestroyTerminal implements HttpRequestHandler {
+
+		@Override
+		public void handle(HttpRequest request, HttpResponse response, HttpContext context)
+				throws HttpException, IOException {
+
+			if(request instanceof HttpEntityEnclosingRequest) {
+				HttpEntity entity = ((HttpEntityEnclosingRequest) request).getEntity();
+				if(entity == null) {
+					//TODO whatever
+				} else {
+					String json = EntityUtils.toString(entity);
+					ETerminalData ent = gson.fromJson(json, ETerminalData.class);
+					System.out.println("Destroying terminalwith ID: " + ent.id);
+
+					//TODO: Process the status
+				}
+			}
+		}
+
+	}
+
+	private static class RHPlayerStatus implements HttpRequestHandler {
+
+		@Override
+		public void handle(HttpRequest request, HttpResponse response, HttpContext context)
+				throws HttpException, IOException {
+
+			if(request instanceof HttpEntityEnclosingRequest) {
+				HttpEntity entity = ((HttpEntityEnclosingRequest) request).getEntity();
+				if(entity == null) {
+					//TODO whatever
+				} else {
+					String json = EntityUtils.toString(entity);
+					EPlayerData ent = gson.fromJson(json, EPlayerData.class);
+
+					System.out.println("Player/Owner status of " + ent.id + " is " + (ent.online ? "ONLINE" : "OFFLINE"));
+
+					//TODO: Process the status
 				}
 			}
 		}

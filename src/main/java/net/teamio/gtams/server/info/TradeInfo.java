@@ -1,9 +1,8 @@
-package net.teamio.gtams.server.entities;
+package net.teamio.gtams.server.info;
 
 public class TradeInfo {
 
 	public TradeInfo() {
-		// TODO Auto-generated constructor stub
 	}
 
 	public float meanPrice;

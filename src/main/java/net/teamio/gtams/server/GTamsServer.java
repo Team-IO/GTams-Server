@@ -3,6 +3,7 @@ package net.teamio.gtams.server;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.ArrayList;
 import java.util.Random;
 import java.util.UUID;
 
@@ -35,10 +36,13 @@ import com.google.gson.GsonBuilder;
 
 import net.teamio.gtams.server.entities.EAuthenticate;
 import net.teamio.gtams.server.entities.EPlayerData;
+import net.teamio.gtams.server.entities.ETerminalCreateTrade;
 import net.teamio.gtams.server.entities.ETerminalData;
 import net.teamio.gtams.server.entities.ETerminalOwner;
-import net.teamio.gtams.server.entities.TradeDescriptor;
-import net.teamio.gtams.server.entities.TradeInfo;
+import net.teamio.gtams.server.info.Trade;
+import net.teamio.gtams.server.info.TradeDescriptor;
+import net.teamio.gtams.server.info.TradeInfo;
+import net.teamio.gtams.server.info.TradeList;
 
 public class GTamsServer {
 
@@ -61,9 +65,12 @@ public class GTamsServer {
 
 		HttpService httpService = new HttpService(processor, mapper);
 
+		//TODO: clean up these endpoints!!
 		mapper.register("/authenticate", new RHAuth());
 		mapper.register("/terminal_status", new RHTerminalStatus());
 		mapper.register("/terminal_owner", new RHTerminalOwner());
+		mapper.register("/terminal_trades", new RHTerminalTrades());
+		mapper.register("/terminal_newtrade", new RHTerminalNewTrade());
 		mapper.register("/newterminal", new RHNewTerminal());
 		mapper.register("/destroyterminal", new RHDestroyTerminal());
 		mapper.register("/player_status", new RHPlayerStatus());
@@ -148,12 +155,12 @@ public class GTamsServer {
 		public void handle(HttpRequest request, HttpResponse response, HttpContext context)
 				throws HttpException, IOException {
 
-			EAuthenticate entity = new EAuthenticate(UUID.randomUUID().toString());
+			EAuthenticate ent = new EAuthenticate(UUID.randomUUID().toString());
 
-			System.out.println("Authenticating Client with 'token' random UUID: " + entity.token);
+			System.out.println("Authenticating Client with 'token' random UUID: " + ent.token);
 
 			response.setStatusCode(HttpStatus.SC_CREATED);
-			response.setEntity(new StringEntity(gson.toJson(entity)));
+			response.setEntity(new StringEntity(gson.toJson(ent)));
 		}
 
 	}
@@ -175,6 +182,76 @@ public class GTamsServer {
 					System.out.println("Terminal status of " + ent.id + " is " + (ent.online ? "ONLINE" : "OFFLINE"));
 
 					//TODO: Process the status
+				}
+			}
+		}
+
+	}
+
+	private static class RHTerminalTrades implements HttpRequestHandler {
+
+		@Override
+		public void handle(HttpRequest request, HttpResponse response, HttpContext context)
+				throws HttpException, IOException {
+
+			if(request instanceof HttpEntityEnclosingRequest) {
+				HttpEntity entity = ((HttpEntityEnclosingRequest) request).getEntity();
+				if(entity == null) {
+					//TODO whatever
+				} else {
+					String json = EntityUtils.toString(entity);
+					ETerminalData ent = gson.fromJson(json, ETerminalData.class);
+
+					System.out.println("Terminal " + ent.id + " requested current trades.");
+
+					ArrayList<Trade> trades = new ArrayList<>();
+
+					trades.add(new Trade(new TradeDescriptor("minecraft:stick", 0, "")));
+					trades.add(new Trade(new TradeDescriptor("minecraft:potato", 0, "")));
+					trades.add(new Trade(new TradeDescriptor("minecraft:enchanted_book", 0, "98765ab6785f8765ed7657865a7865765c876a58765")));
+					trades.add(new Trade(new TradeDescriptor("minecraft:diamond_sword", 302, "")));
+					trades.add(new Trade(new TradeDescriptor("minecraft:beef", 0, "")));
+
+					TradeList tl = new TradeList(trades);
+
+					response.setStatusCode(HttpStatus.SC_OK);
+					response.setEntity(new StringEntity(gson.toJson(tl)));
+				}
+			}
+		}
+
+	}
+
+	private static class RHTerminalNewTrade implements HttpRequestHandler {
+
+		@Override
+		public void handle(HttpRequest request, HttpResponse response, HttpContext context)
+				throws HttpException, IOException {
+
+			if(request instanceof HttpEntityEnclosingRequest) {
+				HttpEntity entity = ((HttpEntityEnclosingRequest) request).getEntity();
+				if(entity == null) {
+					//TODO whatever
+				} else {
+					String json = EntityUtils.toString(entity);
+					ETerminalCreateTrade ent = gson.fromJson(json, ETerminalCreateTrade.class);
+
+					System.out.println("Terminal " + ent.id + " requested to create a new trade.");
+
+					ArrayList<Trade> trades = new ArrayList<>();
+
+					//TODO: actually store the trade
+					trades.add(ent.trade);
+					trades.add(new Trade(new TradeDescriptor("minecraft:stick", 0, "")));
+					trades.add(new Trade(new TradeDescriptor("minecraft:potato", 0, "")));
+					trades.add(new Trade(new TradeDescriptor("minecraft:enchanted_book", 0, "98765ab6785f8765ed7657865a7865765c876a58765")));
+					trades.add(new Trade(new TradeDescriptor("minecraft:diamond_sword", 302, "")));
+					trades.add(new Trade(new TradeDescriptor("minecraft:beef", 0, "")));
+
+					TradeList tl = new TradeList(trades);
+
+					response.setStatusCode(HttpStatus.SC_CREATED);
+					response.setEntity(new StringEntity(gson.toJson(tl)));
 				}
 			}
 		}

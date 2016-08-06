@@ -1,4 +1,4 @@
-package net.teamio.gtams.server.entities;
+package net.teamio.gtams.server.info;
 
 public class TradeDescriptor {
 
@@ -6,8 +6,9 @@ public class TradeDescriptor {
 	public int damage;
 	public String nbtHash;
 
+	//TODO: serialized NBT instead of hash? (use hash to identify, but send nbt data as well)
+
 	public TradeDescriptor() {
-		// TODO Auto-generated constructor stub
 	}
 
 	/**
@@ -23,7 +24,10 @@ public class TradeDescriptor {
 
 	@Override
 	public String toString() {
-		return "TradeDescriptor [itemName=" + itemName + ", damage=" + damage + ", nbtHash=" + nbtHash + "]";
+		if(nbtHash.isEmpty()) {
+			return itemName + "@" + Integer.toString(damage);
+		}
+		return itemName + "@" + Integer.toString(damage) + " +{NBT}";
 	}
 
 }

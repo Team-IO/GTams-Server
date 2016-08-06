@@ -5,6 +5,7 @@ import java.util.UUID;
 public class EPlayerData {
 
 	public UUID id;
+	public int funds;
 	public boolean online;
 
 	/**

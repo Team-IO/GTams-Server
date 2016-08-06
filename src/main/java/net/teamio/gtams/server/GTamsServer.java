@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 import org.apache.http.HttpConnectionFactory;
@@ -38,7 +39,10 @@ import net.teamio.gtams.server.entities.EPlayerData;
 import net.teamio.gtams.server.entities.ETerminalCreateNew;
 import net.teamio.gtams.server.entities.ETerminalCreateTrade;
 import net.teamio.gtams.server.entities.ETerminalData;
+import net.teamio.gtams.server.entities.ETerminalGoodsAdd;
 import net.teamio.gtams.server.entities.ETerminalOwner;
+import net.teamio.gtams.server.info.Goods;
+import net.teamio.gtams.server.info.GoodsList;
 import net.teamio.gtams.server.info.Trade;
 import net.teamio.gtams.server.info.TradeDescriptor;
 import net.teamio.gtams.server.info.TradeInfo;
@@ -78,15 +82,20 @@ public class GTamsServer {
 		mapper.register("/terminal_owner", new RHTerminalOwner());
 		mapper.register("/terminal_trades", new RHTerminalTrades());
 		mapper.register("/terminal_newtrade", new RHTerminalNewTrade());
+		mapper.register("/terminal_goods", new RHTerminalGoodsGet());
+		mapper.register("/terminal_goods_add", new RHTerminalGoodsAdd());
 		mapper.register("/newterminal", new RHNewTerminal());
 		mapper.register("/destroyterminal", new RHDestroyTerminal());
 		mapper.register("/player_status", new RHPlayerStatus());
 		mapper.register("/trade", new RHTradeInfo());
 
 		ListenerThread liThread = new ListenerThread(httpService);
-		System.out.println("Server started...");
-
 		liThread.start();
+
+		MatcherThread maThread = new MatcherThread();
+		maThread.start();
+
+		System.out.println("Server started...");
 	}
 
 	private class ListenerThread extends Thread {
@@ -119,6 +128,25 @@ public class GTamsServer {
 			} catch (IOException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
+			}
+		}
+	}
+
+	private class MatcherThread extends Thread {
+
+		public MatcherThread() {
+			super("GTams Matcher Thread");
+		}
+
+		@Override
+		public void run() {
+			TradeMatcher matcher = new TradeMatcher(store);
+			while (!Thread.interrupted()) {
+				matcher.matchTrades();
+				try {
+					Thread.sleep(2000);
+				} catch (InterruptedException e) {
+				}
 			}
 		}
 	}
@@ -188,7 +216,7 @@ public class GTamsServer {
 
 					System.out.println("Terminal status of " + ent.id + " is " + (ent.online ? "ONLINE" : "OFFLINE"));
 
-					//TODO: Process the status
+					store.setTerminalStatus(ent.id, ent.online);
 				}
 			}
 		}
@@ -211,15 +239,7 @@ public class GTamsServer {
 
 					System.out.println("Terminal " + ent.id + " requested current trades.");
 
-					ArrayList<Trade> trades = new ArrayList<>();
-
-					trades.add(new Trade(new TradeDescriptor("minecraft:stick", 0, "")));
-					trades.add(new Trade(new TradeDescriptor("minecraft:potato", 0, "")));
-					trades.add(new Trade(new TradeDescriptor("minecraft:enchanted_book", 0, "98765ab6785f8765ed7657865a7865765c876a58765")));
-					trades.add(new Trade(new TradeDescriptor("minecraft:diamond_sword", 302, "")));
-					trades.add(new Trade(new TradeDescriptor("minecraft:beef", 0, "")));
-
-					TradeList tl = new TradeList(trades);
+					TradeList tl = new TradeList(store.getTradesForTerminal(ent.id));
 
 					response.setStatusCode(HttpStatus.SC_OK);
 					response.setEntity(new StringEntity(gson.toJson(tl)));
@@ -318,6 +338,58 @@ public class GTamsServer {
 
 		}
 
+	}
+
+	private class RHTerminalGoodsGet implements HttpRequestHandler {
+
+		@Override
+		public void handle(HttpRequest request, HttpResponse response, HttpContext context)
+				throws HttpException, IOException {
+
+			if(request instanceof HttpEntityEnclosingRequest) {
+				HttpEntity entity = ((HttpEntityEnclosingRequest) request).getEntity();
+				if(entity == null) {
+					//TODO whatever
+				} else {
+					String json = EntityUtils.toString(entity);
+					ETerminalData ent = gson.fromJson(json, ETerminalData.class);
+					System.out.println("Terminal " + ent.id + " requested goods list.");
+
+					GoodsList gl = store.getGoods(ent.id);
+
+					response.setStatusCode(HttpStatus.SC_CREATED);
+					response.setEntity(new StringEntity(gson.toJson(gl)));
+				}
+			}
+		}
+	}
+
+	private class RHTerminalGoodsAdd implements HttpRequestHandler {
+
+		@Override
+		public void handle(HttpRequest request, HttpResponse response, HttpContext context)
+				throws HttpException, IOException {
+
+			if(request instanceof HttpEntityEnclosingRequest) {
+				HttpEntity entity = ((HttpEntityEnclosingRequest) request).getEntity();
+				if(entity == null) {
+					//TODO whatever
+				} else {
+					String json = EntityUtils.toString(entity);
+					ETerminalGoodsAdd ent = gson.fromJson(json, ETerminalGoodsAdd.class);
+					System.out.println("Terminal " + ent.id + " requested goods list.");
+
+					List<Goods> goods = ent.goods;
+
+					for(Goods g : goods) {
+						Goods inStore = store.getGoods(ent.id, g.what);
+						inStore.locked += g.locked;
+						inStore.unlocked += g.unlocked;
+						store.saveGoods(inStore);
+					}
+				}
+			}
+		}
 	}
 
 	private class RHDestroyTerminal implements HttpRequestHandler {

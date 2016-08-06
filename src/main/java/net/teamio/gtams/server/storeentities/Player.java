@@ -2,8 +2,10 @@ package net.teamio.gtams.server.storeentities;
 
 import java.util.UUID;
 
-public class Terminal {
+public class Player {
+
 	public UUID id;
-	public UUID owner;
+	public int funds;
 	public boolean online;
+
 }

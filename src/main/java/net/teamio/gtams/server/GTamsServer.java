@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
-import java.util.Random;
 import java.util.UUID;
 
 import org.apache.http.HttpConnectionFactory;
@@ -36,6 +35,7 @@ import com.google.gson.GsonBuilder;
 
 import net.teamio.gtams.server.entities.EAuthenticate;
 import net.teamio.gtams.server.entities.EPlayerData;
+import net.teamio.gtams.server.entities.ETerminalCreateNew;
 import net.teamio.gtams.server.entities.ETerminalCreateTrade;
 import net.teamio.gtams.server.entities.ETerminalData;
 import net.teamio.gtams.server.entities.ETerminalOwner;
@@ -43,6 +43,7 @@ import net.teamio.gtams.server.info.Trade;
 import net.teamio.gtams.server.info.TradeDescriptor;
 import net.teamio.gtams.server.info.TradeInfo;
 import net.teamio.gtams.server.info.TradeList;
+import net.teamio.gtams.server.storeentities.Terminal;
 
 public class GTamsServer {
 
@@ -54,7 +55,13 @@ public class GTamsServer {
 
 	static Gson gson = new GsonBuilder().serializeNulls().setPrettyPrinting().create();
 
+	private DataStore store;
+
 	public GTamsServer() {
+		System.out.println("Loading data store...");
+
+		store = new DataStore();
+
 		System.out.println("Setting up HTTP Server...");
 
 		HttpProcessor processor = HttpProcessorBuilder.create().add(new ResponseDate())
@@ -82,7 +89,7 @@ public class GTamsServer {
 		liThread.start();
 	}
 
-	private static class ListenerThread extends Thread {
+	private class ListenerThread extends Thread {
 		private final HttpConnectionFactory<DefaultBHttpServerConnection> connFactory;
 		private ServerSocket socket;
 		private final HttpService service;
@@ -116,7 +123,7 @@ public class GTamsServer {
 		}
 	}
 
-	private static class WorkerThread extends Thread {
+	private class WorkerThread extends Thread {
 		private final HttpServerConnection conn;
 		private final HttpService service;
 
@@ -149,7 +156,7 @@ public class GTamsServer {
 		}
 	}
 
-	private static class RHAuth implements HttpRequestHandler {
+	private class RHAuth implements HttpRequestHandler {
 
 		@Override
 		public void handle(HttpRequest request, HttpResponse response, HttpContext context)
@@ -165,7 +172,7 @@ public class GTamsServer {
 
 	}
 
-	private static class RHTerminalStatus implements HttpRequestHandler {
+	private class RHTerminalStatus implements HttpRequestHandler {
 
 		@Override
 		public void handle(HttpRequest request, HttpResponse response, HttpContext context)
@@ -188,7 +195,7 @@ public class GTamsServer {
 
 	}
 
-	private static class RHTerminalTrades implements HttpRequestHandler {
+	private class RHTerminalTrades implements HttpRequestHandler {
 
 		@Override
 		public void handle(HttpRequest request, HttpResponse response, HttpContext context)
@@ -222,7 +229,7 @@ public class GTamsServer {
 
 	}
 
-	private static class RHTerminalNewTrade implements HttpRequestHandler {
+	private class RHTerminalNewTrade implements HttpRequestHandler {
 
 		@Override
 		public void handle(HttpRequest request, HttpResponse response, HttpContext context)
@@ -240,15 +247,10 @@ public class GTamsServer {
 
 					ArrayList<Trade> trades = new ArrayList<>();
 
-					//TODO: actually store the trade
-					trades.add(ent.trade);
-					trades.add(new Trade(new TradeDescriptor("minecraft:stick", 0, "")));
-					trades.add(new Trade(new TradeDescriptor("minecraft:potato", 0, "")));
-					trades.add(new Trade(new TradeDescriptor("minecraft:enchanted_book", 0, "98765ab6785f8765ed7657865a7865765c876a58765")));
-					trades.add(new Trade(new TradeDescriptor("minecraft:diamond_sword", 302, "")));
-					trades.add(new Trade(new TradeDescriptor("minecraft:beef", 0, "")));
+					ent.trade.terminalId = ent.id;
+					store.addTrade(ent.trade);
 
-					TradeList tl = new TradeList(trades);
+					TradeList tl = new TradeList(store.getTradesForTerminal(ent.id));
 
 					response.setStatusCode(HttpStatus.SC_CREATED);
 					response.setEntity(new StringEntity(gson.toJson(tl)));
@@ -258,7 +260,7 @@ public class GTamsServer {
 
 	}
 
-	private static class RHTerminalOwner implements HttpRequestHandler {
+	private class RHTerminalOwner implements HttpRequestHandler {
 
 		@Override
 		public void handle(HttpRequest request, HttpResponse response, HttpContext context)
@@ -274,30 +276,51 @@ public class GTamsServer {
 
 					System.out.println("Terminal " + ent.id + " is now owned by " + ent.owner);
 
-					//TODO: Process the status
+					Terminal term = store.getTerminal(ent.id);
+					term.owner = ent.owner;
+					store.saveTerminal(term);
 				}
 			}
 		}
 
 	}
 
-	private static class RHNewTerminal implements HttpRequestHandler {
+	private class RHNewTerminal implements HttpRequestHandler {
 
 		@Override
 		public void handle(HttpRequest request, HttpResponse response, HttpContext context)
 				throws HttpException, IOException {
 
-			ETerminalData entity = new ETerminalData(UUID.randomUUID(), true);
+			if(request instanceof HttpEntityEnclosingRequest) {
+				HttpEntity entity = ((HttpEntityEnclosingRequest) request).getEntity();
+				if(entity == null) {
+					//TODO whatever
+				} else {
+					String json = EntityUtils.toString(entity);
+					ETerminalCreateNew ent = gson.fromJson(json, ETerminalCreateNew.class);
+					System.out.println("Owner " + ent.owner + " requested new terminal.");
 
-			System.out.println("Creating new terminalwith ID: " + entity.id);
+					ETerminalData responseEntity = new ETerminalData(UUID.randomUUID(), true);
 
-			response.setStatusCode(HttpStatus.SC_CREATED);
-			response.setEntity(new StringEntity(gson.toJson(entity)));
+					System.out.println("Creating new terminalwith ID: " + responseEntity.id);
+
+					Terminal term = new Terminal();
+					term.id = responseEntity.id;
+					term.owner = ent.owner;
+
+					store.addTerminal(term);
+
+					response.setStatusCode(HttpStatus.SC_CREATED);
+					response.setEntity(new StringEntity(gson.toJson(responseEntity)));
+				}
+			}
+
+
 		}
 
 	}
 
-	private static class RHDestroyTerminal implements HttpRequestHandler {
+	private class RHDestroyTerminal implements HttpRequestHandler {
 
 		@Override
 		public void handle(HttpRequest request, HttpResponse response, HttpContext context)
@@ -312,14 +335,14 @@ public class GTamsServer {
 					ETerminalData ent = gson.fromJson(json, ETerminalData.class);
 					System.out.println("Destroying terminalwith ID: " + ent.id);
 
-					//TODO: Process the status
+					store.deleteTerminal(ent.id);
 				}
 			}
 		}
 
 	}
 
-	private static class RHPlayerStatus implements HttpRequestHandler {
+	private class RHPlayerStatus implements HttpRequestHandler {
 
 		@Override
 		public void handle(HttpRequest request, HttpResponse response, HttpContext context)
@@ -335,14 +358,14 @@ public class GTamsServer {
 
 					System.out.println("Player/Owner status of " + ent.id + " is " + (ent.online ? "ONLINE" : "OFFLINE"));
 
-					//TODO: Process the status
+					store.setPlayerStatus(ent.id, ent.online);
 				}
 			}
 		}
 
 	}
 
-	private static class RHTradeInfo implements HttpRequestHandler {
+	private class RHTradeInfo implements HttpRequestHandler {
 
 		@Override
 		public void handle(HttpRequest request, HttpResponse response, HttpContext context)
@@ -358,22 +381,11 @@ public class GTamsServer {
 
 					System.out.println("Client requested trade info for " + ent);
 					System.out.println(json);
-					Random rand = new Random();
 
-					TradeInfo info = new TradeInfo();
-					info.demand = rand.nextInt(30000);
-					info.supply = rand.nextInt(30000);
+					TradeInfo info = store.getTradeInfo(ent);
 
-					if(info.demand == 0) {
-						info.supplyDemandFactor = Float.POSITIVE_INFINITY;
-					} else {
-						info.supplyDemandFactor = info.supply / (float)info.demand;
-					}
-					info.tradesLastPeriod = rand.nextInt(30000) + 100;
-					info.volumeLastPeriod = rand.nextInt(30000) + 100;
-					info.meanPrice = info.volumeLastPeriod / (float)info.tradesLastPeriod;
 
-					response.setStatusCode(HttpStatus.SC_CREATED);
+					response.setStatusCode(HttpStatus.SC_OK);
 					response.setEntity(new StringEntity(gson.toJson(info)));
 				}
 			}

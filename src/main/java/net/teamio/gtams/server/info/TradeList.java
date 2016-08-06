@@ -1,6 +1,7 @@
 package net.teamio.gtams.server.info;
 
 import java.util.ArrayList;
+import java.util.List;
 
 public class TradeList {
 
@@ -8,9 +9,9 @@ public class TradeList {
 		trades = new ArrayList<>();
 	}
 
-	public TradeList(ArrayList<Trade> trades) {
-		this.trades = trades;
+	public TradeList(List<Trade> list) {
+		this.trades = list;
 	}
 
-	public ArrayList<Trade> trades;
+	public List<Trade> trades;
 }

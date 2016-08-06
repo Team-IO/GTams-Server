@@ -1,6 +1,10 @@
 package net.teamio.gtams.server.info;
 
+import java.util.UUID;
+
 public class Trade {
+
+	public UUID terminalId;
 
 	public TradeDescriptor descriptor;
 	public boolean isBuy;

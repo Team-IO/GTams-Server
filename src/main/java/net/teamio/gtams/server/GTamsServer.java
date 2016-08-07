@@ -231,7 +231,7 @@ public class GTamsServer {
 
 					System.out.println("Terminal status of " + ent.id + " is " + (ent.online ? "ONLINE" : "OFFLINE"));
 
-					store.setTerminalStatus(ent.id, ent.online);
+					store.setTerminalStatus(ent.id, ent.owner, ent.online);
 				}
 			}
 		}
@@ -338,7 +338,7 @@ public class GTamsServer {
 
 					System.out.println("Terminal " + ent.id + " is now owned by " + ent.owner);
 
-					Terminal term = store.getTerminal(ent.id);
+					Terminal term = store.getTerminal(ent.id, ent.owner);
 					term.owner = ent.owner;
 					store.saveTerminal(term);
 				}
@@ -362,7 +362,7 @@ public class GTamsServer {
 					ETerminalCreateNew ent = gson.fromJson(json, ETerminalCreateNew.class);
 					System.out.println("Owner " + ent.owner + " requested new terminal.");
 
-					ETerminalData responseEntity = new ETerminalData(UUID.randomUUID(), true);
+					ETerminalData responseEntity = new ETerminalData(UUID.randomUUID(), ent.owner, true);
 
 					System.out.println("Creating new terminalwith ID: " + responseEntity.id);
 

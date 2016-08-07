@@ -46,11 +46,12 @@ public class DataStore {
 		terminalGoods = Collections.synchronizedMap(new HashMap<>());
 	}
 
-	public Terminal getTerminal(UUID id) {
+	public Terminal getTerminal(UUID id, UUID owner) {
 		Terminal term = terminals.get(id);
 		if(term == null) {
 			term = new Terminal();
 			term.id = id;
+			term.owner = owner;
 			addTerminal(term);
 		}
 		return term;
@@ -227,15 +228,11 @@ public class DataStore {
 		return player;
 	}
 
-	public void setTerminalStatus(UUID id, boolean online) {
+	public void setTerminalStatus(UUID id, UUID owner, boolean online) {
 		synchronized(terminals) {
-			Terminal term = getTerminal(id);
-			if(term == null) {
-				//TODO: create new terminal?
-			} else {
-				term.online = online;
-				saveTerminal(term);
-			}
+			Terminal term = getTerminal(id, owner);
+			term.online = online;
+			saveTerminal(term);
 		}
 	}
 

@@ -65,10 +65,16 @@ public class TradeMatcher {
 	}
 
 	private boolean makeTransaction(Trade buy, Trade sell, int amount) {
-		Terminal customerTerminal = store.getTerminal(buy.terminalId);
-		Terminal vendorTerminal = store.getTerminal(sell.terminalId);
+		Terminal customerTerminal = store.getTerminal(buy.terminalId, null);
+		Terminal vendorTerminal = store.getTerminal(sell.terminalId, null);
 		int price = Math.min(buy.price, sell.price);
 		int cost = price * amount;
+
+		if(customerTerminal.owner == null && vendorTerminal.owner == null) {
+			// This might be problematic
+			return false;
+		}
+
 		Player cus = store.getPlayer(customerTerminal.owner);
 		Player ven = store.getPlayer(vendorTerminal.owner);
 		//TODO: later for production:

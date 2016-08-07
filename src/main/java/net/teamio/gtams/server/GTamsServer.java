@@ -48,6 +48,7 @@ import net.teamio.gtams.server.info.Trade;
 import net.teamio.gtams.server.info.TradeDescriptor;
 import net.teamio.gtams.server.info.TradeInfo;
 import net.teamio.gtams.server.info.TradeList;
+import net.teamio.gtams.server.storeentities.Player;
 import net.teamio.gtams.server.storeentities.Terminal;
 
 public class GTamsServer {
@@ -77,7 +78,6 @@ public class GTamsServer {
 
 		HttpService httpService = new HttpService(processor, mapper);
 
-		//TODO: clean up these endpoints!!
 		mapper.register("/authenticate", new RHAuth());
 
 		mapper.register("/terminal/new", new RHNewTerminal());
@@ -93,6 +93,7 @@ public class GTamsServer {
 		mapper.register("/terminal/goods/add", new RHTerminalGoodsAdd());
 		mapper.register("/terminal/goods/remove", new RHTerminalGoodsRemove());
 
+		mapper.register("/player", new RHPlayerInfo());
 		mapper.register("/player/status", new RHPlayerStatus());
 		mapper.register("/market/query", new RHMarketInfo());
 
@@ -500,6 +501,31 @@ public class GTamsServer {
 					System.out.println("Player/Owner status of " + ent.id + " is " + (ent.online ? "ONLINE" : "OFFLINE"));
 
 					store.setPlayerStatus(ent.id, ent.online);
+				}
+			}
+		}
+
+	}
+	private class RHPlayerInfo implements HttpRequestHandler {
+
+		@Override
+		public void handle(HttpRequest request, HttpResponse response, HttpContext context)
+				throws HttpException, IOException {
+
+			if(request instanceof HttpEntityEnclosingRequest) {
+				HttpEntity entity = ((HttpEntityEnclosingRequest) request).getEntity();
+				if(entity == null) {
+					//TODO whatever
+				} else {
+					String json = EntityUtils.toString(entity);
+					EPlayerData ent = gson.fromJson(json, EPlayerData.class);
+
+					System.out.println("Player/Owner status of " + ent.id + " is " + (ent.online ? "ONLINE" : "OFFLINE"));
+
+					Player player = store.getPlayer(ent.id);
+
+					response.setStatusCode(HttpStatus.SC_OK);
+					response.setEntity(new StringEntity(gson.toJson(player)));
 				}
 			}
 		}

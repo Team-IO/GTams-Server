@@ -5,7 +5,7 @@ import java.util.UUID;
 public class Player {
 
 	public UUID id;
-	public int funds;
+	public long funds;
 	public boolean online;
 
 }

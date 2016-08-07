@@ -5,15 +5,15 @@ import java.util.UUID;
 
 import net.teamio.gtams.server.info.Goods;
 
-public class ETerminalGoodsAdd {
+public class ETerminalGoodsData {
 
 	public UUID id;
 	public List<Goods> goods;
 
-	public ETerminalGoodsAdd() {
+	public ETerminalGoodsData() {
 	}
 
-	public ETerminalGoodsAdd(UUID id, List<Goods> goods) {
+	public ETerminalGoodsData(UUID id, List<Goods> goods) {
 		this.id = id;
 		this.goods = goods;
 	}

@@ -6,7 +6,7 @@ public class Trade {
 
 	public UUID terminalId;
 
-	public int tradeId;
+	public long tradeId;
 
 	public TradeDescriptor descriptor;
 

@@ -2,11 +2,19 @@ package net.teamio.gtams.server.info;
 
 public class Goods {
 	public TradeDescriptor what;
-	public int locked;
-	public int unlocked;
+	public int amount;
+
+	public Goods() {
+
+	}
+
+	public Goods(TradeDescriptor what, int amount) {
+		this.what = what;
+		this.amount = amount;
+	}
 
 	@Override
 	public String toString() {
-		return "[l" + locked + " u" + unlocked + "]x" + what;
+		return amount + " of " + what;
 	}
 }

@@ -3,7 +3,6 @@ package net.teamio.gtams.server;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -40,7 +39,8 @@ import net.teamio.gtams.server.entities.EPlayerData;
 import net.teamio.gtams.server.entities.ETerminalCreateNew;
 import net.teamio.gtams.server.entities.ETerminalCreateTrade;
 import net.teamio.gtams.server.entities.ETerminalData;
-import net.teamio.gtams.server.entities.ETerminalGoodsAdd;
+import net.teamio.gtams.server.entities.ETerminalDeleteTrade;
+import net.teamio.gtams.server.entities.ETerminalGoodsData;
 import net.teamio.gtams.server.entities.ETerminalOwner;
 import net.teamio.gtams.server.info.Goods;
 import net.teamio.gtams.server.info.GoodsList;
@@ -79,16 +79,22 @@ public class GTamsServer {
 
 		//TODO: clean up these endpoints!!
 		mapper.register("/authenticate", new RHAuth());
-		mapper.register("/terminal_status", new RHTerminalStatus());
-		mapper.register("/terminal_owner", new RHTerminalOwner());
-		mapper.register("/terminal_trades", new RHTerminalTrades());
-		mapper.register("/terminal_newtrade", new RHTerminalNewTrade());
-		mapper.register("/terminal_goods", new RHTerminalGoodsGet());
-		mapper.register("/terminal_goods_add", new RHTerminalGoodsAdd());
-		mapper.register("/newterminal", new RHNewTerminal());
-		mapper.register("/destroyterminal", new RHDestroyTerminal());
-		mapper.register("/player_status", new RHPlayerStatus());
-		mapper.register("/trade", new RHTradeInfo());
+
+		mapper.register("/terminal/new", new RHNewTerminal());
+		mapper.register("/terminal/destroy", new RHDestroyTerminal());
+		mapper.register("/terminal/status", new RHTerminalStatus());
+		mapper.register("/terminal/owner", new RHTerminalOwner());
+
+		mapper.register("/terminal/trades", new RHTerminalTrades());
+		mapper.register("/terminal/trades/add", new RHTerminalNewTrade());
+		mapper.register("/terminal/trades/remove", new RHTerminalRemoveTrade());
+
+		mapper.register("/terminal/goods", new RHTerminalGoodsGet());
+		mapper.register("/terminal/goods/add", new RHTerminalGoodsAdd());
+		mapper.register("/terminal/goods/remove", new RHTerminalGoodsRemove());
+
+		mapper.register("/player/status", new RHPlayerStatus());
+		mapper.register("/market/query", new RHMarketInfo());
 
 		ListenerThread liThread = new ListenerThread(httpService);
 		liThread.start();
@@ -143,7 +149,12 @@ public class GTamsServer {
 		public void run() {
 			TradeMatcher matcher = new TradeMatcher(store);
 			while (!Thread.interrupted()) {
-				matcher.matchTrades();
+				try {
+					matcher.matchTrades();
+				} catch (Exception e1) {
+					// TODO Auto-generated catch block
+					e1.printStackTrace();
+				}
 				try {
 					Thread.sleep(2000);
 				} catch (InterruptedException e) {
@@ -268,14 +279,41 @@ public class GTamsServer {
 
 					System.out.println("Terminal " + ent.id + " requested to create a new trade.");
 
-					ArrayList<Trade> trades = new ArrayList<>();
-
 					ent.trade.terminalId = ent.id;
 					store.addTrade(ent.trade);
 
 					TradeList tl = new TradeList(store.getTradesForTerminal(ent.id));
 
 					response.setStatusCode(HttpStatus.SC_CREATED);
+					response.setEntity(new StringEntity(gson.toJson(tl)));
+				}
+			}
+		}
+
+	}
+
+	private class RHTerminalRemoveTrade implements HttpRequestHandler {
+
+		@Override
+		public void handle(HttpRequest request, HttpResponse response, HttpContext context)
+				throws HttpException, IOException {
+
+			if(request instanceof HttpEntityEnclosingRequest) {
+				HttpEntity entity = ((HttpEntityEnclosingRequest) request).getEntity();
+				if(entity == null) {
+					//TODO whatever
+				} else {
+					String json = EntityUtils.toString(entity);
+					ETerminalDeleteTrade ent = gson.fromJson(json, ETerminalDeleteTrade.class);
+
+					System.out.println("Terminal " + ent.id + " requested to delete an existing trade.");
+
+					Trade trade = store.getTrade(ent.id,ent.trade);
+					store.deleteTrade(trade);
+
+					TradeList tl = new TradeList(store.getTradesForTerminal(ent.id));
+
+					response.setStatusCode(HttpStatus.SC_OK);
 					response.setEntity(new StringEntity(gson.toJson(tl)));
 				}
 			}
@@ -379,17 +417,45 @@ public class GTamsServer {
 					//TODO whatever
 				} else {
 					String json = EntityUtils.toString(entity);
-					ETerminalGoodsAdd ent = gson.fromJson(json, ETerminalGoodsAdd.class);
-					System.out.println("Terminal " + ent.id + " requested goods list.");
+					ETerminalGoodsData ent = gson.fromJson(json, ETerminalGoodsData.class);
+					System.out.println("Terminal " + ent.id + " requested to add goods.");
 
 					List<Goods> goods = ent.goods;
 
 					for(Goods g : goods) {
 						Goods inStore = store.getGoods(ent.id, g.what);
-						inStore.locked += g.locked;
-						inStore.unlocked += g.unlocked;
+						inStore.amount += g.amount;
 						store.saveGoods(inStore);
 					}
+
+					GoodsList gl = store.getGoods(ent.id);
+
+					response.setStatusCode(HttpStatus.SC_CREATED);
+					response.setEntity(new StringEntity(gson.toJson(gl)));
+				}
+			}
+		}
+	}
+
+	private class RHTerminalGoodsRemove implements HttpRequestHandler {
+
+		@Override
+		public void handle(HttpRequest request, HttpResponse response, HttpContext context)
+				throws HttpException, IOException {
+
+			if(request instanceof HttpEntityEnclosingRequest) {
+				HttpEntity entity = ((HttpEntityEnclosingRequest) request).getEntity();
+				if(entity == null) {
+					//TODO whatever
+				} else {
+					String json = EntityUtils.toString(entity);
+					ETerminalGoodsData ent = gson.fromJson(json, ETerminalGoodsData.class);
+					System.out.println("Terminal " + ent.id + " requested to remove goods.");
+
+					GoodsList actuallyRemoved = store.removeGoods(ent.id, ent.goods);
+
+					response.setStatusCode(HttpStatus.SC_OK);
+					response.setEntity(new StringEntity(gson.toJson(actuallyRemoved)));
 				}
 			}
 		}
@@ -440,7 +506,7 @@ public class GTamsServer {
 
 	}
 
-	private class RHTradeInfo implements HttpRequestHandler {
+	private class RHMarketInfo implements HttpRequestHandler {
 
 		@Override
 		public void handle(HttpRequest request, HttpResponse response, HttpContext context)

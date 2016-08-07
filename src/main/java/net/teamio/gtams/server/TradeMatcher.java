@@ -84,18 +84,15 @@ public class TradeMatcher {
 
 							// Check goods
 							Goods goods = store.getGoods(sell.terminalId, sell.descriptor);
-							if(goods.locked + goods.unlocked >= amount) {
+							if(goods.amount >= amount) {
 								cus.funds -= cost;
 								ven.funds += cost;
 
 								Goods delivery = store.getGoods(buy.terminalId, buy.descriptor);
 
-								int consume = Math.min(goods.locked, amount);
-								goods.locked -= consume;
-								if(consume < amount) {
-									goods.unlocked -= amount - consume;
-								}
-								delivery.unlocked += amount;
+								int consume = Math.min(goods.amount, amount);
+								goods.amount -= consume;
+								delivery.amount += amount;
 
 								store.saveGoods(goods);
 								store.saveGoods(delivery);

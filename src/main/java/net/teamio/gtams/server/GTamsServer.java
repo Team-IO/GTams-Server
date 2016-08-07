@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import org.apache.http.ConnectionClosedException;
 import org.apache.http.HttpConnectionFactory;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpEntityEnclosingRequest;
@@ -167,6 +168,8 @@ public class GTamsServer {
 				while (!Thread.interrupted() && conn.isOpen()) {
 					service.handleRequest(conn, context);
 				}
+			} catch(ConnectionClosedException e) {
+				System.out.println("Client disconnected, terminating worker thread.");
 			} catch (IOException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();

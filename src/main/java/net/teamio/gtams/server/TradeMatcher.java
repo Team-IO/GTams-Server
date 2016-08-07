@@ -100,8 +100,8 @@ public class TradeMatcher {
 								goods.amount -= consume;
 								delivery.amount += amount;
 
-								store.saveGoods(goods);
-								store.saveGoods(delivery);
+								store.saveGoods(buy.terminalId);
+								store.saveGoods(sell.terminalId);
 								store.savePlayer(cus);
 								store.savePlayer(ven);
 								store.addTransaction(new Transaction(vendorTerminal.owner, customerTerminal.owner, buy.descriptor, amount, price));

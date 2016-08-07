@@ -5,21 +5,22 @@ public class TradeDescriptor {
 	public String itemName;
 	public int damage;
 	public String nbtHash;
-
-	//TODO: serialized NBT instead of hash? (use hash to identify, but send nbt data as well)
+	public byte[] nbt;
 
 	public TradeDescriptor() {
 	}
 
-	/**
-	 * @param itemName
-	 * @param damage
-	 * @param nbtHash
-	 */
-	public TradeDescriptor(String itemName, int damage, String nbtHash) {
+	public TradeDescriptor(String itemName, int damage) {
+		this.itemName = itemName;
+		this.damage = damage;
+		this.nbtHash = "";
+	}
+
+	public TradeDescriptor(String itemName, int damage, String nbtHash, byte[] nbt) {
 		this.itemName = itemName;
 		this.damage = damage;
 		this.nbtHash = nbtHash;
+		this.nbt = nbt;
 	}
 
 	@Override
@@ -28,6 +29,13 @@ public class TradeDescriptor {
 			return itemName + "@" + Integer.toString(damage);
 		}
 		return itemName + "@" + Integer.toString(damage) + " +{NBT}";
+	}
+
+	public String toFilename() {
+		if(nbtHash.isEmpty()) {
+			return itemName + "@" + Integer.toString(damage);
+		}
+		return itemName + "@" + Integer.toString(damage) + "{" + nbtHash + "}";
 	}
 
 	@Override

@@ -3,7 +3,6 @@ package net.teamio.gtams.server;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.List;
 import java.util.UUID;
 
 import org.apache.http.ConnectionClosedException;
@@ -42,7 +41,6 @@ import net.teamio.gtams.server.entities.ETerminalData;
 import net.teamio.gtams.server.entities.ETerminalDeleteTrade;
 import net.teamio.gtams.server.entities.ETerminalGoodsData;
 import net.teamio.gtams.server.entities.ETerminalOwner;
-import net.teamio.gtams.server.info.Goods;
 import net.teamio.gtams.server.info.GoodsList;
 import net.teamio.gtams.server.info.Trade;
 import net.teamio.gtams.server.info.TradeDescriptor;
@@ -53,20 +51,21 @@ import net.teamio.gtams.server.storeentities.Terminal;
 
 public class GTamsServer {
 
-	public static final int PORT = 20405;
+	public static final int PORT = 60405;
 
 	public static void main(String[] args) {
 		new GTamsServer();
 	}
 
-	static Gson gson = new GsonBuilder().serializeNulls().setPrettyPrinting().create();
+	static Gson gson = new GsonBuilder().serializeNulls()
+			.registerTypeHierarchyAdapter(byte[].class, new ByteArrayBase64Adapter()).create();
 
 	private DataStore store;
 
 	public GTamsServer() {
 		System.out.println("Loading data store...");
 
-		store = new DataStore();
+		store = new DataStoreJSON();
 
 		System.out.println("Setting up HTTP Server...");
 
@@ -224,15 +223,16 @@ public class GTamsServer {
 			if(request instanceof HttpEntityEnclosingRequest) {
 				HttpEntity entity = ((HttpEntityEnclosingRequest) request).getEntity();
 				if(entity == null) {
-					//TODO whatever
-				} else {
-					String json = EntityUtils.toString(entity);
-					ETerminalData ent = gson.fromJson(json, ETerminalData.class);
-
-					System.out.println("Terminal status of " + ent.id + " is " + (ent.online ? "ONLINE" : "OFFLINE"));
-
-					store.setTerminalStatus(ent.id, ent.owner, ent.online);
+					response.setStatusCode(HttpStatus.SC_BAD_REQUEST);
+					response.setEntity(new StringEntity("{\"error\": \"No Request Data\"}"));
+					return;
 				}
+				String json = EntityUtils.toString(entity);
+				ETerminalData ent = gson.fromJson(json, ETerminalData.class);
+
+				System.out.println("Terminal status of " + ent.id + " is " + (ent.online ? "ONLINE" : "OFFLINE"));
+
+				store.setTerminalStatus(ent.id, ent.owner, ent.online);
 			}
 		}
 
@@ -247,18 +247,19 @@ public class GTamsServer {
 			if(request instanceof HttpEntityEnclosingRequest) {
 				HttpEntity entity = ((HttpEntityEnclosingRequest) request).getEntity();
 				if(entity == null) {
-					//TODO whatever
-				} else {
-					String json = EntityUtils.toString(entity);
-					ETerminalData ent = gson.fromJson(json, ETerminalData.class);
-
-					System.out.println("Terminal " + ent.id + " requested current trades.");
-
-					TradeList tl = new TradeList(store.getTradesForTerminal(ent.id));
-
-					response.setStatusCode(HttpStatus.SC_OK);
-					response.setEntity(new StringEntity(gson.toJson(tl)));
+					response.setStatusCode(HttpStatus.SC_BAD_REQUEST);
+					response.setEntity(new StringEntity("{\"error\": \"No Request Data\"}"));
+					return;
 				}
+				String json = EntityUtils.toString(entity);
+				ETerminalData ent = gson.fromJson(json, ETerminalData.class);
+
+				System.out.println("Terminal " + ent.id + " requested current trades.");
+
+				TradeList tl = new TradeList(store.getTradesForTerminal(ent.id));
+
+				response.setStatusCode(HttpStatus.SC_OK);
+				response.setEntity(new StringEntity(gson.toJson(tl)));
 			}
 		}
 
@@ -273,21 +274,27 @@ public class GTamsServer {
 			if(request instanceof HttpEntityEnclosingRequest) {
 				HttpEntity entity = ((HttpEntityEnclosingRequest) request).getEntity();
 				if(entity == null) {
-					//TODO whatever
-				} else {
-					String json = EntityUtils.toString(entity);
-					ETerminalCreateTrade ent = gson.fromJson(json, ETerminalCreateTrade.class);
-
-					System.out.println("Terminal " + ent.id + " requested to create a new trade.");
-
-					ent.trade.terminalId = ent.id;
-					store.addTrade(ent.trade);
-
-					TradeList tl = new TradeList(store.getTradesForTerminal(ent.id));
-
-					response.setStatusCode(HttpStatus.SC_CREATED);
-					response.setEntity(new StringEntity(gson.toJson(tl)));
+					response.setStatusCode(HttpStatus.SC_BAD_REQUEST);
+					response.setEntity(new StringEntity("{\"error\": \"No Request Data\"}"));
+					return;
 				}
+				String json = EntityUtils.toString(entity);
+				ETerminalCreateTrade ent = gson.fromJson(json, ETerminalCreateTrade.class);
+
+				System.out.println("Terminal " + ent.id + " requested to create a new trade.");
+
+				if(ent.trade == null) {
+					response.setStatusCode(HttpStatus.SC_BAD_REQUEST);
+					response.setEntity(new StringEntity("{\"error\": \"No Trade Specified\"}"));
+					return;
+				}
+				ent.trade.terminalId = ent.id;
+				store.addTrade(ent.trade);
+
+				TradeList tl = new TradeList(store.getTradesForTerminal(ent.id));
+
+				response.setStatusCode(HttpStatus.SC_CREATED);
+				response.setEntity(new StringEntity(gson.toJson(tl)));
 			}
 		}
 
@@ -302,21 +309,22 @@ public class GTamsServer {
 			if(request instanceof HttpEntityEnclosingRequest) {
 				HttpEntity entity = ((HttpEntityEnclosingRequest) request).getEntity();
 				if(entity == null) {
-					//TODO whatever
-				} else {
-					String json = EntityUtils.toString(entity);
-					ETerminalDeleteTrade ent = gson.fromJson(json, ETerminalDeleteTrade.class);
-
-					System.out.println("Terminal " + ent.id + " requested to delete an existing trade.");
-
-					Trade trade = store.getTrade(ent.id,ent.trade);
-					store.deleteTrade(trade);
-
-					TradeList tl = new TradeList(store.getTradesForTerminal(ent.id));
-
-					response.setStatusCode(HttpStatus.SC_OK);
-					response.setEntity(new StringEntity(gson.toJson(tl)));
+					response.setStatusCode(HttpStatus.SC_BAD_REQUEST);
+					response.setEntity(new StringEntity("{\"error\": \"No Request Data\"}"));
+					return;
 				}
+				String json = EntityUtils.toString(entity);
+				ETerminalDeleteTrade ent = gson.fromJson(json, ETerminalDeleteTrade.class);
+
+				System.out.println("Terminal " + ent.id + " requested to delete an existing trade.");
+
+				Trade trade = store.getTrade(ent.id,ent.trade);
+				store.deleteTrade(trade);
+
+				TradeList tl = new TradeList(store.getTradesForTerminal(ent.id));
+
+				response.setStatusCode(HttpStatus.SC_OK);
+				response.setEntity(new StringEntity(gson.toJson(tl)));
 			}
 		}
 
@@ -331,17 +339,18 @@ public class GTamsServer {
 			if(request instanceof HttpEntityEnclosingRequest) {
 				HttpEntity entity = ((HttpEntityEnclosingRequest) request).getEntity();
 				if(entity == null) {
-					//TODO whatever
-				} else {
-					String json = EntityUtils.toString(entity);
-					ETerminalOwner ent = gson.fromJson(json, ETerminalOwner.class);
-
-					System.out.println("Terminal " + ent.id + " is now owned by " + ent.owner);
-
-					Terminal term = store.getTerminal(ent.id, ent.owner);
-					term.owner = ent.owner;
-					store.saveTerminal(term);
+					response.setStatusCode(HttpStatus.SC_BAD_REQUEST);
+					response.setEntity(new StringEntity("{\"error\": \"No Request Data\"}"));
+					return;
 				}
+				String json = EntityUtils.toString(entity);
+				ETerminalOwner ent = gson.fromJson(json, ETerminalOwner.class);
+
+				System.out.println("Terminal " + ent.id + " is now owned by " + ent.owner);
+
+				Terminal term = store.getTerminal(ent.id, ent.owner);
+				term.owner = ent.owner;
+				store.saveTerminal(term);
 			}
 		}
 
@@ -356,25 +365,26 @@ public class GTamsServer {
 			if(request instanceof HttpEntityEnclosingRequest) {
 				HttpEntity entity = ((HttpEntityEnclosingRequest) request).getEntity();
 				if(entity == null) {
-					//TODO whatever
-				} else {
-					String json = EntityUtils.toString(entity);
-					ETerminalCreateNew ent = gson.fromJson(json, ETerminalCreateNew.class);
-					System.out.println("Owner " + ent.owner + " requested new terminal.");
-
-					ETerminalData responseEntity = new ETerminalData(UUID.randomUUID(), ent.owner, true);
-
-					System.out.println("Creating new terminalwith ID: " + responseEntity.id);
-
-					Terminal term = new Terminal();
-					term.id = responseEntity.id;
-					term.owner = ent.owner;
-
-					store.addTerminal(term);
-
-					response.setStatusCode(HttpStatus.SC_CREATED);
-					response.setEntity(new StringEntity(gson.toJson(responseEntity)));
+					response.setStatusCode(HttpStatus.SC_BAD_REQUEST);
+					response.setEntity(new StringEntity("{\"error\": \"No Request Data\"}"));
+					return;
 				}
+				String json = EntityUtils.toString(entity);
+				ETerminalCreateNew ent = gson.fromJson(json, ETerminalCreateNew.class);
+				System.out.println("Owner " + ent.owner + " requested new terminal.");
+
+				ETerminalData responseEntity = new ETerminalData(UUID.randomUUID(), ent.owner, true);
+
+				System.out.println("Creating new terminalwith ID: " + responseEntity.id);
+
+				Terminal term = new Terminal();
+				term.id = responseEntity.id;
+				term.owner = ent.owner;
+
+				store.addTerminal(term);
+
+				response.setStatusCode(HttpStatus.SC_CREATED);
+				response.setEntity(new StringEntity(gson.toJson(responseEntity)));
 			}
 
 
@@ -391,17 +401,18 @@ public class GTamsServer {
 			if(request instanceof HttpEntityEnclosingRequest) {
 				HttpEntity entity = ((HttpEntityEnclosingRequest) request).getEntity();
 				if(entity == null) {
-					//TODO whatever
-				} else {
-					String json = EntityUtils.toString(entity);
-					ETerminalData ent = gson.fromJson(json, ETerminalData.class);
-					System.out.println("Terminal " + ent.id + " requested goods list.");
-
-					GoodsList gl = store.getGoods(ent.id);
-
-					response.setStatusCode(HttpStatus.SC_CREATED);
-					response.setEntity(new StringEntity(gson.toJson(gl)));
+					response.setStatusCode(HttpStatus.SC_BAD_REQUEST);
+					response.setEntity(new StringEntity("{\"error\": \"No Request Data\"}"));
+					return;
 				}
+				String json = EntityUtils.toString(entity);
+				ETerminalData ent = gson.fromJson(json, ETerminalData.class);
+				System.out.println("Terminal " + ent.id + " requested goods list.");
+
+				GoodsList gl = store.getGoods(ent.id);
+
+				response.setStatusCode(HttpStatus.SC_CREATED);
+				response.setEntity(new StringEntity(gson.toJson(gl)));
 			}
 		}
 	}
@@ -415,25 +426,20 @@ public class GTamsServer {
 			if(request instanceof HttpEntityEnclosingRequest) {
 				HttpEntity entity = ((HttpEntityEnclosingRequest) request).getEntity();
 				if(entity == null) {
-					//TODO whatever
-				} else {
-					String json = EntityUtils.toString(entity);
-					ETerminalGoodsData ent = gson.fromJson(json, ETerminalGoodsData.class);
-					System.out.println("Terminal " + ent.id + " requested to add goods.");
-
-					List<Goods> goods = ent.goods;
-
-					for(Goods g : goods) {
-						Goods inStore = store.getGoods(ent.id, g.what);
-						inStore.amount += g.amount;
-						store.saveGoods(inStore);
-					}
-
-					GoodsList gl = store.getGoods(ent.id);
-
-					response.setStatusCode(HttpStatus.SC_CREATED);
-					response.setEntity(new StringEntity(gson.toJson(gl)));
+					response.setStatusCode(HttpStatus.SC_BAD_REQUEST);
+					response.setEntity(new StringEntity("{\"error\": \"No Request Data\"}"));
+					return;
 				}
+				String json = EntityUtils.toString(entity);
+				ETerminalGoodsData ent = gson.fromJson(json, ETerminalGoodsData.class);
+				System.out.println("Terminal " + ent.id + " requested to add goods.");
+
+				store.addGoods(ent.id, ent.goods);
+
+				GoodsList gl = store.getGoods(ent.id);
+
+				response.setStatusCode(HttpStatus.SC_CREATED);
+				response.setEntity(new StringEntity(gson.toJson(gl)));
 			}
 		}
 	}
@@ -447,17 +453,18 @@ public class GTamsServer {
 			if(request instanceof HttpEntityEnclosingRequest) {
 				HttpEntity entity = ((HttpEntityEnclosingRequest) request).getEntity();
 				if(entity == null) {
-					//TODO whatever
-				} else {
-					String json = EntityUtils.toString(entity);
-					ETerminalGoodsData ent = gson.fromJson(json, ETerminalGoodsData.class);
-					System.out.println("Terminal " + ent.id + " requested to remove goods.");
-
-					GoodsList actuallyRemoved = store.removeGoods(ent.id, ent.goods);
-
-					response.setStatusCode(HttpStatus.SC_OK);
-					response.setEntity(new StringEntity(gson.toJson(actuallyRemoved)));
+					response.setStatusCode(HttpStatus.SC_BAD_REQUEST);
+					response.setEntity(new StringEntity("{\"error\": \"No Request Data\"}"));
+					return;
 				}
+				String json = EntityUtils.toString(entity);
+				ETerminalGoodsData ent = gson.fromJson(json, ETerminalGoodsData.class);
+				System.out.println("Terminal " + ent.id + " requested to remove goods.");
+
+				GoodsList actuallyRemoved = store.removeGoods(ent.id, ent.goods);
+
+				response.setStatusCode(HttpStatus.SC_OK);
+				response.setEntity(new StringEntity(gson.toJson(actuallyRemoved)));
 			}
 		}
 	}
@@ -471,14 +478,15 @@ public class GTamsServer {
 			if(request instanceof HttpEntityEnclosingRequest) {
 				HttpEntity entity = ((HttpEntityEnclosingRequest) request).getEntity();
 				if(entity == null) {
-					//TODO whatever
-				} else {
-					String json = EntityUtils.toString(entity);
-					ETerminalData ent = gson.fromJson(json, ETerminalData.class);
-					System.out.println("Destroying terminalwith ID: " + ent.id);
-
-					store.deleteTerminal(ent.id);
+					response.setStatusCode(HttpStatus.SC_BAD_REQUEST);
+					response.setEntity(new StringEntity("{\"error\": \"No Request Data\"}"));
+					return;
 				}
+				String json = EntityUtils.toString(entity);
+				ETerminalData ent = gson.fromJson(json, ETerminalData.class);
+				System.out.println("Destroying terminalwith ID: " + ent.id);
+
+				store.deleteTerminal(ent.id);
 			}
 		}
 
@@ -493,7 +501,9 @@ public class GTamsServer {
 			if(request instanceof HttpEntityEnclosingRequest) {
 				HttpEntity entity = ((HttpEntityEnclosingRequest) request).getEntity();
 				if(entity == null) {
-					//TODO whatever
+					response.setStatusCode(HttpStatus.SC_BAD_REQUEST);
+					response.setEntity(new StringEntity("{\"error\": \"No Request Data\"}"));
+					return;
 				} else {
 					String json = EntityUtils.toString(entity);
 					EPlayerData ent = gson.fromJson(json, EPlayerData.class);
@@ -515,18 +525,19 @@ public class GTamsServer {
 			if(request instanceof HttpEntityEnclosingRequest) {
 				HttpEntity entity = ((HttpEntityEnclosingRequest) request).getEntity();
 				if(entity == null) {
-					//TODO whatever
-				} else {
-					String json = EntityUtils.toString(entity);
-					EPlayerData ent = gson.fromJson(json, EPlayerData.class);
-
-					System.out.println("Player/Owner status of " + ent.id + " is " + (ent.online ? "ONLINE" : "OFFLINE"));
-
-					Player player = store.getPlayer(ent.id);
-
-					response.setStatusCode(HttpStatus.SC_OK);
-					response.setEntity(new StringEntity(gson.toJson(player)));
+					response.setStatusCode(HttpStatus.SC_BAD_REQUEST);
+					response.setEntity(new StringEntity("{\"error\": \"No Request Data\"}"));
+					return;
 				}
+				String json = EntityUtils.toString(entity);
+				EPlayerData ent = gson.fromJson(json, EPlayerData.class);
+
+				System.out.println("Player/Owner status of " + ent.id + " is " + (ent.online ? "ONLINE" : "OFFLINE"));
+
+				Player player = store.getPlayer(ent.id);
+
+				response.setStatusCode(HttpStatus.SC_OK);
+				response.setEntity(new StringEntity(gson.toJson(player)));
 			}
 		}
 
@@ -541,20 +552,21 @@ public class GTamsServer {
 			if(request instanceof HttpEntityEnclosingRequest) {
 				HttpEntity entity = ((HttpEntityEnclosingRequest) request).getEntity();
 				if(entity == null) {
-					//TODO whatever
-				} else {
-					String json = EntityUtils.toString(entity);
-					TradeDescriptor ent = gson.fromJson(json, TradeDescriptor.class);
-
-					System.out.println("Client requested trade info for " + ent);
-					System.out.println(json);
-
-					TradeInfo info = store.getTradeInfo(ent);
-
-
-					response.setStatusCode(HttpStatus.SC_OK);
-					response.setEntity(new StringEntity(gson.toJson(info)));
+					response.setStatusCode(HttpStatus.SC_BAD_REQUEST);
+					response.setEntity(new StringEntity("{\"error\": \"No Request Data\"}"));
+					return;
 				}
+				String json = EntityUtils.toString(entity);
+				TradeDescriptor ent = gson.fromJson(json, TradeDescriptor.class);
+
+				System.out.println("Client requested trade info for " + ent);
+				System.out.println(json);
+
+				TradeInfo info = store.getTradeInfo(ent);
+
+
+				response.setStatusCode(HttpStatus.SC_OK);
+				response.setEntity(new StringEntity(gson.toJson(info)));
 			}
 		}
 

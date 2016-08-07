@@ -20,7 +20,7 @@ import net.teamio.gtams.server.storeentities.Player;
 import net.teamio.gtams.server.storeentities.Terminal;
 
 
-public class DataStore {
+public abstract class DataStore {
 
 	private static final int DEFAULT_FUNDS = 50;
 
@@ -33,7 +33,7 @@ public class DataStore {
 	private final Set<Trade> sellTrades;
 
 	private final Set<TradeDescriptor> activeDescriptors;
-	private final Set<TradeDescriptor> inactiveDescriptors;
+	protected final Set<TradeDescriptor> inactiveDescriptors;
 
 	public DataStore() {
 		terminals = new HashMap<>();
@@ -44,6 +44,8 @@ public class DataStore {
 		buyTrades = Collections.synchronizedSet(new HashSet<>());
 		sellTrades = Collections.synchronizedSet(new HashSet<>());
 		terminalGoods = Collections.synchronizedMap(new HashMap<>());
+
+		loadCache();
 	}
 
 	public Terminal getTerminal(UUID id, UUID owner) {
@@ -57,65 +59,50 @@ public class DataStore {
 		return term;
 	}
 
+	protected void addTerminalInternal(Terminal terminal) {
+		if(terminals.containsKey(terminal.id)) {
+			throw new DuplicateKeyException("Trying to add duplicate terminal id " + terminal.id);
+		}
+		terminals.put(terminal.id, terminal);
+	}
+
 	public void addTerminal(Terminal terminal) {
 		synchronized (terminals) {
-			if(terminals.containsKey(terminal.id)) {
-				throw new DuplicateKeyException("Trying to add duplicate terminal id " + terminal.id);
-			}
-			terminals.put(terminal.id, terminal);
+			addTerminalInternal(terminal);
+			saveTerminal(terminal);
 		}
 	}
 
-	public void saveTerminal(Terminal terminal) {
-		//TODO: Trigger DB update
-	}
+	protected abstract void loadCache();
 
-	public void deleteSavedTerminal(UUID id) {
-		//TODO: delete form DB
-	}
+	protected abstract void saveTerminal(Terminal terminal);
 
-	public void saveDescriptor(TradeDescriptor descriptor) {
-		//TODO: Trigger DB update
-	}
+	protected abstract void deleteSavedTerminal(UUID id);
 
-	public void saveTrade(Trade trade) {
-		//TODO: Trigger DB update
-	}
+	protected abstract void saveDescriptor(TradeDescriptor descriptor);
 
-	public void deleteSavedTrade(Trade trade) {
-		//TODO: delete form DB
-	}
+	protected abstract void saveTrades(UUID terminalId);
 
-	public void savePlayer(Player player) {
-		// TODO Update DB
+	protected abstract void savePlayer(Player player);
 
-	}
+	protected abstract void saveGoods(UUID terminalId);
 
-	public void saveGoods(Goods goods) {
-		// TODO save to DB
-
-	}
-
-	private void deleteSavedGoods(Goods inStock) {
-		// TODO Auto-generated method stub
-
-	}
-
-	public void addTransaction(Transaction transaction) {
-		//transactions.add(transaction);
-		//saveTransaction(transaction);
-	}
+	protected abstract void addTransaction(Transaction transaction);
 
 	private long lastTradeID = 0;
 
 	public void addTrade(Trade newTrade) {
+		addTradeInternal(newTrade);
+		saveTrades(newTrade.terminalId);
+	}
+
+	protected void addTradeInternal(Trade newTrade) {
 		synchronized (activeDescriptors) {
 			// Update descriptors
 			if (activeDescriptors.add(newTrade.descriptor)) {
-				if (inactiveDescriptors.remove(newTrade.descriptor)) {
-					// New descriptor -> trigger save
-					saveDescriptor(newTrade.descriptor);
-				}
+				inactiveDescriptors.remove(newTrade.descriptor);
+				// New descriptor -> trigger save
+				saveDescriptor(newTrade.descriptor);
 			}
 		}
 		synchronized (terminalTrades) {
@@ -133,7 +120,6 @@ public class DataStore {
 		} else {
 			sellTrades.add(newTrade);
 		}
-		saveTrade(newTrade);
 	}
 
 	public Collection<Trade> getTradesForTerminal(UUID terminalId) {
@@ -156,7 +142,7 @@ public class DataStore {
 				}
 			}
 		}
-		deleteSavedTrade(trade);
+		saveTrades(trade.terminalId);
 	}
 
 	public Trade getTrade(UUID terminalId, long tradeId) {
@@ -203,9 +189,6 @@ public class DataStore {
 			buyTrades.removeAll(tradesForTerminal);
 			sellTrades.removeAll(tradesForTerminal);
 
-			for(Trade tr : tradesForTerminal) {
-				deleteSavedTrade(tr);
-			}
 			//TODO: delete & return all related goods
 			terminalTrades.remove(id);
 			terminals.remove(id);
@@ -266,23 +249,27 @@ public class DataStore {
 			if(request == null) {
 				return new GoodsList();
 			}
-			Map<TradeDescriptor, Goods> goods = terminalGoods.get(terminalID);
-			if(goods == null) {
-				goods = new HashMap<>();
-				terminalGoods.put(terminalID, goods);
-			}
-			for(Goods g : request) {
-				Goods inStock = goods.get(g.what);
-				if(inStock == null) {
-					goods.put(g.what, g);
-					saveGoods(g);
-				} else {
-					inStock.amount += g.amount;
-					saveGoods(inStock);
-				}
-			}
+			Map<TradeDescriptor, Goods> goods = addGoodsInternal(terminalID, request);
+			saveGoods(terminalID);
 			return new GoodsList(goods.values());
 		}
+	}
+
+	protected Map<TradeDescriptor, Goods> addGoodsInternal(UUID terminalID, List<Goods> list) {
+		Map<TradeDescriptor, Goods> goods = terminalGoods.get(terminalID);
+		if(goods == null) {
+			goods = new HashMap<>();
+			terminalGoods.put(terminalID, goods);
+		}
+		for(Goods g : list) {
+			Goods inStock = goods.get(g.what);
+			if(inStock == null) {
+				goods.put(g.what, g);
+			} else {
+				inStock.amount += g.amount;
+			}
+		}
+		return goods;
 	}
 
 	public GoodsList removeGoods(UUID terminalID, List<Goods> request) {
@@ -302,12 +289,12 @@ public class DataStore {
 					inStock.amount -= deducted;
 					if(inStock.amount == 0) {
 						goods.remove(inStock.what);
-						deleteSavedGoods(inStock);
 					}
 
 					returnList.goods.add(new Goods(g.what, deducted));
 				}
 			}
+			saveGoods(terminalID);
 			return returnList;
 		}
 	}

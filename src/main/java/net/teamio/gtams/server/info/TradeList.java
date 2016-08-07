@@ -2,21 +2,27 @@ package net.teamio.gtams.server.info;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.List;
 
 public class TradeList {
+	public ArrayList<Trade> trades;
 
 	public TradeList() {
 		trades = new ArrayList<>();
 	}
 
-	public TradeList(List<Trade> list) {
+	public TradeList(ArrayList<Trade> list) {
 		this.trades = list;
+		if (trades == null) {
+			trades = new ArrayList<>();
+		}
 	}
 
 	public TradeList(Collection<Trade> list) {
-		this.trades = new ArrayList<>(list);
+		if (list == null) {
+			this.trades = new ArrayList<>();
+		} else {
+			this.trades = new ArrayList<>(list);
+		}
 	}
 
-	public List<Trade> trades;
 }

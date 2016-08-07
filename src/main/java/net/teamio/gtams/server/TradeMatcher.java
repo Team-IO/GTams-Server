@@ -55,7 +55,7 @@ public class TradeMatcher {
 		}
 	}
 
-	private boolean amountSufficient(Trade buy, Trade sell) {
+	private static boolean amountSufficient(Trade buy, Trade sell) {
 		if(sell.allowPartialFulfillment) {
 			// Seller allows partial fulfillment, amount can be smaller than sales volume
 			return buy.allowPartialFulfillment || sell.amount >= buy.amount;

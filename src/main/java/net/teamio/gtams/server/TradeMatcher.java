@@ -1,11 +1,10 @@
 package net.teamio.gtams.server;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 import net.teamio.gtams.server.info.Goods;
+import net.teamio.gtams.server.info.Mode;
 import net.teamio.gtams.server.info.Trade;
 import net.teamio.gtams.server.info.Transaction;
 import net.teamio.gtams.server.storeentities.Player;
@@ -25,9 +24,6 @@ public class TradeMatcher {
 		List<Trade> sell = new ArrayList<>(store.getSellTrades());
 		sell.removeIf((Trade trade) -> !trade.isDue());
 
-		Set<Trade> completedBuy = new HashSet<>();
-		Set<Trade> completedSell = new HashSet<>();
-
 		buy.sort(Trade.Comparator.INSTANCE);
 		sell.sort(Trade.Comparator.INSTANCE);
 
@@ -43,11 +39,13 @@ public class TradeMatcher {
 				// Buy price covers sell price
 				if(b.price >= s.price && amountSufficient(b, s)) {
 					if(makeTransaction(b, s, Math.min(b.amount, s.amount))) {
-						completedBuy.add(b);
-						completedSell.add(s);
 						sell.remove(s);
-						store.deleteTrade(s);
-						store.deleteTrade(b);
+						if(s.mode == Mode.Once) {
+							store.deleteTrade(s);
+						}
+						if(b.mode == Mode.Once) {
+							store.deleteTrade(b);
+						}
 						break;
 					}
 				}

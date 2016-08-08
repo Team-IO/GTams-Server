@@ -204,11 +204,12 @@ public abstract class DataStore {
 			player = players.get(id);
 			if(player == null) {
 				player = new Player();
-				player.id = id;
 				player.funds = DEFAULT_FUNDS;
+				player.id = id;
 				players.put(id, player);
 				savePlayer(player);
 			}
+			player.id = id;
 		}
 		return player;
 	}

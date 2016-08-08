@@ -34,7 +34,9 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
 import net.teamio.gtams.server.entities.EAuthenticate;
+import net.teamio.gtams.server.entities.EAuthenticateRequest;
 import net.teamio.gtams.server.entities.EPlayerData;
+import net.teamio.gtams.server.entities.EPlayerStatusRequest;
 import net.teamio.gtams.server.entities.ETerminalCreateNew;
 import net.teamio.gtams.server.entities.ETerminalCreateTrade;
 import net.teamio.gtams.server.entities.ETerminalData;
@@ -204,7 +206,34 @@ public class GTamsServer {
 		public void handle(HttpRequest request, HttpResponse response, HttpContext context)
 				throws HttpException, IOException {
 
-			EAuthenticate ent = new EAuthenticate(UUID.randomUUID().toString());
+
+			EAuthenticateRequest instanceData = null;
+			if(request instanceof HttpEntityEnclosingRequest) {
+				HttpEntity entity = ((HttpEntityEnclosingRequest) request).getEntity();
+				if(entity != null) {
+					String json = EntityUtils.toString(entity);
+					instanceData = gson.fromJson(json, EAuthenticateRequest.class);
+
+					if(instanceData != null) {
+						try {
+							// Verify if the token is valid
+							UUID.fromString(instanceData.token);
+						} catch (IllegalArgumentException e) {
+							instanceData.token = null;
+						}
+					}
+				}
+			}
+
+			if(instanceData == null) {
+				instanceData = new EAuthenticateRequest();
+			}
+			if(instanceData.token == null) {
+				instanceData.token = UUID.randomUUID().toString();
+			}
+			store.saveInstance(instanceData);
+
+			EAuthenticate ent = new EAuthenticate(instanceData.token);
 
 			System.out.println("Authenticating Client with 'token' random UUID: " + ent.token);
 
@@ -286,6 +315,11 @@ public class GTamsServer {
 				if(ent.trade == null) {
 					response.setStatusCode(HttpStatus.SC_BAD_REQUEST);
 					response.setEntity(new StringEntity("{\"error\": \"No Trade Specified\"}"));
+					return;
+				}
+				if(ent.id == null) {
+					response.setStatusCode(HttpStatus.SC_BAD_REQUEST);
+					response.setEntity(new StringEntity("{\"error\": \"No Terminal ID Specified\"}"));
 					return;
 				}
 				ent.trade.terminalId = ent.id;
@@ -504,14 +538,13 @@ public class GTamsServer {
 					response.setStatusCode(HttpStatus.SC_BAD_REQUEST);
 					response.setEntity(new StringEntity("{\"error\": \"No Request Data\"}"));
 					return;
-				} else {
-					String json = EntityUtils.toString(entity);
-					EPlayerData ent = gson.fromJson(json, EPlayerData.class);
-
-					System.out.println("Player/Owner status of " + ent.id + " is " + (ent.online ? "ONLINE" : "OFFLINE"));
-
-					store.setPlayerStatus(ent.id, ent.online);
 				}
+				String json = EntityUtils.toString(entity);
+				EPlayerStatusRequest ent = gson.fromJson(json, EPlayerStatusRequest.class);
+
+				System.out.println("Player/Owner status of " + ent.id + " is " + (ent.online ? "ONLINE" : "OFFLINE"));
+
+				store.setPlayerStatus(ent.id, ent.name, ent.online);
 			}
 		}
 
@@ -560,10 +593,8 @@ public class GTamsServer {
 				TradeDescriptor ent = gson.fromJson(json, TradeDescriptor.class);
 
 				System.out.println("Client requested trade info for " + ent);
-				System.out.println(json);
 
 				TradeInfo info = store.getTradeInfo(ent);
-
 
 				response.setStatusCode(HttpStatus.SC_OK);
 				response.setEntity(new StringEntity(gson.toJson(info)));

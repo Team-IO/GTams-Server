@@ -15,6 +15,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonSyntaxException;
 
+import net.teamio.gtams.server.entities.EAuthenticateRequest;
 import net.teamio.gtams.server.info.GoodsList;
 import net.teamio.gtams.server.info.Trade;
 import net.teamio.gtams.server.info.TradeDescriptor;
@@ -260,6 +261,16 @@ public class DataStoreJSON extends DataStore {
 			writeFile(player, "player", player.id.toString());
 		} catch (GTamsServerException e) {
 			System.err.println("Error writing player");
+			e.printStackTrace();
+		}
+	}
+
+	@Override
+	public void saveInstance(EAuthenticateRequest instanceData) {
+		try {
+			writeFile(instanceData, "instance", instanceData.token);
+		} catch (GTamsServerException e) {
+			System.err.println("Error writing instance");
 			e.printStackTrace();
 		}
 	}

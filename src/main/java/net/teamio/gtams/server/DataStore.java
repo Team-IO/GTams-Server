@@ -10,6 +10,7 @@ import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
 
+import net.teamio.gtams.server.entities.EAuthenticateRequest;
 import net.teamio.gtams.server.info.Goods;
 import net.teamio.gtams.server.info.GoodsList;
 import net.teamio.gtams.server.info.Trade;
@@ -176,9 +177,10 @@ public abstract class DataStore {
 		return info;
 	}
 
-	public void setPlayerStatus(UUID id, boolean online) {
+	public void setPlayerStatus(UUID id, String name, boolean online) {
 		Player player = getPlayer(id);
 		player.online = online;
+		player.name = name;
 		savePlayer(player);
 	}
 
@@ -308,4 +310,6 @@ public abstract class DataStore {
 			return new GoodsList(goods.values());
 		}
 	}
+
+	public abstract void saveInstance(EAuthenticateRequest instanceData);
 }

@@ -8,3 +8,17 @@ dependencies {
     compile 'org.apache.httpcomponents:httpcore:4.3.2'
     compile 'com.google.code.gson:gson:2.2.4'
 }
+
+task copyDependencies(type: Copy) {
+	into "$buildDir/libs/lib"
+	from configurations.runtime
+}
+
+assemble.dependsOn copyDependencies
+
+jar {
+	manifest.attributes(
+		'Class-Path': configurations.runtime.files.collect { 'lib/' + it.name }.join(' '),
+		'Main-Class': 'net.teamio.gtams.server.GTamsServer'
+	)
+}

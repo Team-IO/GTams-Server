@@ -138,6 +138,30 @@ public class DataStoreJSON extends DataStore {
 				}
 			}
 		}
+
+		System.out.println("Loading Players");
+		dir = new File("data/player");
+		if(dir.exists()) {
+			File[] children = dir.listFiles(fileFilter);
+
+			for(File file : children) {
+				System.out.println("Reading data/player/" + file.getName());
+				Player player;
+				try {
+					player = readFile(Player.class, file);
+
+					if(player != null && player.id != null) {
+						addPlayerInternal(player);
+					}
+				} catch (GTamsServerException e) {
+					System.err.println("Error reading player from " + file.getName());
+					e.printStackTrace();
+				} catch(DuplicateKeyException e) {
+					System.err.println("Error reading player from " + file.getName());
+					e.printStackTrace();
+				}
+			}
+		}
 		System.out.println("Done loading.");
 	}
 

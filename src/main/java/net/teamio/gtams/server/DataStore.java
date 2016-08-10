@@ -74,6 +74,13 @@ public abstract class DataStore {
 		}
 	}
 
+	protected void addPlayerInternal(Player player) {
+		if(players.containsKey(player.id)) {
+			throw new DuplicateKeyException("Trying to add duplicate player id " + player.id);
+		}
+		players.put(player.id, player);
+	}
+
 	protected abstract void loadCache();
 
 	protected abstract void saveTerminal(Terminal terminal);
